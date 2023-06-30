@@ -1,7 +1,7 @@
 import { Gamestate, BotSelection} from '../models/gamestate';
 
 class Bot {
-    debug:boolean = true
+    debug:boolean = false
 
     RPSDW: BotSelection[] = ['R', 'P', 'S', 'D', 'W'];
     RPSW: BotSelection[] = ['R', 'P', 'S', 'W'];
@@ -38,35 +38,38 @@ class Bot {
         //let move = this.getSemiRandomMove()
         let move = this.getMoveInSequence()
 
+
+
         let patternMove = this.getPattern(gamestate)
-        //if no pattern has been detected...
-        if(!patternMove){
-            //check other bot's strategy with past 50 results
-            if(this.roundNumber>1){
-                this.getRespToEachMove(gamestate)
-                move = this.getOptimalMoves()
-            }
-        } else{
-            move = patternMove
+
+        //check other bot's strategy with past 50 results
+        let historyMove
+        if(this.roundNumber>1){
+            this.getRespToEachMove(gamestate)
+            historyMove = this.getOptimalMove()
         }
 
+        //if no pattern has been detected...
+        if(patternMove!=undefined) {
+            if(this.debug) console.log("==== using pattern ====")
+            move = patternMove
+        } else if(historyMove!=undefined) {
+            if(this.debug) console.log("==== using history ====")
+            move = historyMove
+        } else {
+            if(this.debug) console.log("==== using sequence ====")
+        }
+        console.log("===== MOVE: ",move," =====")
         if(move === 'D') this.dynamiteLeft-=1
-        process.stdout.write(move)
         return move
     }
 
     seqNum = 0
-    pattern:BotSelection[] = ["R","P","S","R","P","S","R","P","S","P","P","P","P"]
+    pattern:BotSelection[] = ["R"]
     getMoveInSequence() {
         //if (this.debug) console.log("using pattern")
-        this.seqNum = this.seqNum<=this.pattern.length ? this.seqNum + 1 : 0
-            return this.pattern[this.seqNum]
-    }
-
-    getSemiRandomMove(){
-        if(this.dynamiteLeft>0) return this.RPSD[Math.floor(Math.random()*this.RPSD.length)]
-        else if(this.totalRounds - this.dynamiteLeft<=0) return "D"
-        else return this.RPS[Math.floor(Math.random()*this.RPS.length)]
+        this.seqNum = this.seqNum<this.pattern.length-1 ? this.seqNum + 1 : 0;
+        return this.pattern[this.seqNum]
     }
 
     getRespToEachMove(gamestate:Gamestate){
@@ -122,7 +125,7 @@ class Bot {
 
                     for(let [p1Move,p2Move] of this.basicGameWinRules as [BotSelection, BotSelection][]){
                         if(p2Move==p2NextMove&&p1Move!='D'){
-                            if (this.debug) console.log("pattern found: ",p2NextMove," next: play ",p1Move,". p2 before: ",gamestate.rounds[roundLen -1].p2)
+                            if (this.debug) console.log(patternLen," pattern found: ",p2NextMove," next: play ",p1Move,". p2 before: ",gamestate.rounds[roundLen -1].p2)
                             return p1Move
                         }
                     }
@@ -134,7 +137,7 @@ class Bot {
 
     }
 
-    getOptimalMoves():BotSelection{
+    getOptimalMove():BotSelection{
         let winningMoves:[string,string][] = []
 
         //get likely responses
@@ -184,8 +187,9 @@ class Bot {
         }
 
         //if winningMoves is greater than 1, get the move that is least likely to fail
-
-        return optimalMove[Math.floor(Math.random()*optimalMove.length)]
+        if(maxScore>=0){
+            return optimalMove[0]
+        }
     }
 
 
