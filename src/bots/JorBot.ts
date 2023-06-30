@@ -1,6 +1,8 @@
 import { Gamestate, BotSelection} from '../models/gamestate';
 
 class Bot {
+    debug:boolean = true
+
     RPSDW: BotSelection[] = ['R', 'P', 'S', 'D', 'W'];
     RPSW: BotSelection[] = ['R', 'P', 'S', 'W'];
     RPSD: BotSelection[] = ['R', 'P', 'S', 'D'];
@@ -30,20 +32,35 @@ class Bot {
 
     ]
 
+
     makeMove(gamestate: Gamestate): BotSelection {
         this.roundNumber += 1
-        let move = this.getSemiRandomMove()
+        //let move = this.getSemiRandomMove()
+        let move = this.getMoveInSequence()
 
-        //check other bot's strategy
-        if(this.roundNumber>1){
-            this.getRespToEachMove(gamestate)
-            move = this.getOptimalMoves()
+        let patternMove = this.getPattern(gamestate)
+        //if no pattern has been detected...
+        if(!patternMove){
+            //check other bot's strategy with past 50 results
+            if(this.roundNumber>1){
+                this.getRespToEachMove(gamestate)
+                move = this.getOptimalMoves()
+            }
+        } else{
+            move = patternMove
         }
-
 
         if(move === 'D') this.dynamiteLeft-=1
         process.stdout.write(move)
         return move
+    }
+
+    seqNum = 0
+    pattern:BotSelection[] = ["R","P","S","R","P","S","R","P","S","P","P","P","P"]
+    getMoveInSequence() {
+        //if (this.debug) console.log("using pattern")
+        this.seqNum = this.seqNum<=this.pattern.length ? this.seqNum + 1 : 0
+            return this.pattern[this.seqNum]
     }
 
     getSemiRandomMove(){
@@ -80,6 +97,43 @@ class Bot {
 
     }
 
+    getPattern(gamestate):BotSelection{
+        let roundLen = gamestate.rounds.length
+
+        for(let patternLen = 25; patternLen > 1; patternLen--){
+
+            if(gamestate.rounds.length>patternLen*3){
+                let foundPattern = false
+                for(let i = 1; i <= patternLen; i++){
+                    // console.log(gamestate.rounds[roundLen - i].p2)
+                    // console.log(gamestate.rounds[roundLen - i - patternLen].p2)
+                    // console.log(gamestate.rounds[roundLen - i].p2)
+                    // console.log(gamestate.rounds[roundLen - i - 2*patternLen].p2)
+                    if(gamestate.rounds[roundLen - i].p2!=gamestate.rounds[roundLen - i - patternLen].p2
+                        || gamestate.rounds[roundLen - i].p2!=gamestate.rounds[roundLen - i - 2*patternLen].p2){
+                        foundPattern = false
+                        break
+                    } else{
+                        foundPattern = true
+                    }
+                }
+                if(foundPattern){
+                    let p2NextMove = gamestate.rounds[roundLen-patternLen - 2].p2
+
+                    for(let [p1Move,p2Move] of this.basicGameWinRules as [BotSelection, BotSelection][]){
+                        if(p2Move==p2NextMove&&p1Move!='D'){
+                            if (this.debug) console.log("pattern found: ",p2NextMove," next: play ",p1Move,". p2 before: ",gamestate.rounds[roundLen -1].p2)
+                            return p1Move
+                        }
+                    }
+                }
+            } else{
+                if (this.debug) console.log("no check for",patternLen)
+            }
+        }
+
+    }
+
     getOptimalMoves():BotSelection{
         let winningMoves:[string,string][] = []
 
@@ -111,8 +165,7 @@ class Bot {
                 }
             }
         }
-
-        console.log(wlCount)
+        if(this.debug) console.log(wlCount)
 
         let maxScore = -Infinity
         let optimalMove:BotSelection[] = []
@@ -134,6 +187,8 @@ class Bot {
 
         return optimalMove[Math.floor(Math.random()*optimalMove.length)]
     }
+
+
 
 }
 
